@@ -1,5 +1,5 @@
 import { PROTOCOL_VERSION } from "@ytmdp/shared";
-import { createPlaybackUpdate, findMediaElement } from "./player.ts";
+import { createPlaybackUpdate, findMediaElement, TrackTransitionGuard } from "./player.ts";
 
 declare global {
   interface Window {
@@ -12,10 +12,11 @@ if (!window.__ytmdpContentLoaded) {
   const sourceId = crypto.randomUUID();
   let debounceTimer: number | undefined;
   let observedMedia: HTMLMediaElement | null = null;
+  const transitionGuard = new TrackTransitionGuard();
   const onMediaEvent = (): void => scheduleSnapshot();
 
   const sendSnapshot = (): void => {
-    const message = createPlaybackUpdate(document, sourceId);
+    const message = transitionGuard.stabilize(createPlaybackUpdate(document, sourceId));
     void chrome.runtime.sendMessage(message).catch(() => {
       // The extension may have been reloaded while this page stayed open.
     });

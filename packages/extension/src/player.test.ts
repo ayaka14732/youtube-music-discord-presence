@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import { createPlaybackUpdate, readTrack } from "./player.ts";
+import {
+  createPlaybackUpdate,
+  readTrack,
+  TrackTransitionGuard,
+} from "./player.ts";
 
 function setPlayerMarkup(): HTMLMediaElement {
   document.body.innerHTML = `
@@ -54,5 +58,44 @@ describe("YouTube Music player reader", () => {
     const update = createPlaybackUpdate(document, "source-1", 123456);
     expect(update.track).toBeNull();
     expect(update.playback.state).toBe("stopped");
+  });
+});
+
+describe("track transition guard", () => {
+  function update(title: string, positionSeconds: number, observedAtMs: number) {
+    return {
+      type: "PLAYBACK_UPDATE" as const,
+      protocolVersion: 1 as const,
+      sourceId: "source-1",
+      observedAtMs,
+      track: { title, artists: ["Artist"] },
+      playback: {
+        state: "playing" as const,
+        positionSeconds,
+        durationSeconds: 508,
+      },
+    };
+  }
+
+  it("does not reuse the previous song position during a track change", () => {
+    const guard = new TrackTransitionGuard();
+    expect(guard.stabilize(update("Old song", 455, 1_000)).playback.positionSeconds).toBe(455);
+
+    const firstNewSnapshot = guard.stabilize(update("New song", 455, 1_100));
+    expect(firstNewSnapshot.playback).toMatchObject({
+      positionSeconds: 0,
+      durationSeconds: null,
+    });
+
+    const resetSnapshot = guard.stabilize(update("New song", 0.4, 1_500));
+    expect(resetSnapshot.playback).toMatchObject({
+      positionSeconds: 0.4,
+      durationSeconds: 508,
+    });
+  });
+
+  it("preserves a non-zero position on the first page snapshot", () => {
+    const guard = new TrackTransitionGuard();
+    expect(guard.stabilize(update("Opened song", 455, 1_000)).playback.positionSeconds).toBe(455);
   });
 });

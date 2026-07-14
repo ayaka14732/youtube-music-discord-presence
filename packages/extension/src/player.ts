@@ -143,3 +143,46 @@ export function createPlaybackUpdate(
     },
   };
 }
+
+function trackIdentity(update: PlaybackUpdate): string | null {
+  if (!update.track) return null;
+  return `${update.track.title}\u0000${update.track.artists.join("\u0000")}`;
+}
+
+export class TrackTransitionGuard {
+  private lastTrackIdentity: string | null = null;
+  private transitionStartedAtMs: number | null = null;
+
+  stabilize(update: PlaybackUpdate): PlaybackUpdate {
+    const identity = trackIdentity(update);
+    if (!identity) return update;
+
+    const changed = this.lastTrackIdentity !== null && identity !== this.lastTrackIdentity;
+    this.lastTrackIdentity = identity;
+
+    if (changed && update.playback.positionSeconds > 5) {
+      this.transitionStartedAtMs = update.observedAtMs;
+    }
+
+    if (this.transitionStartedAtMs === null) return update;
+
+    if (update.playback.positionSeconds <= 5) {
+      this.transitionStartedAtMs = null;
+      return update;
+    }
+
+    const syntheticPosition =
+      update.playback.state === "playing"
+        ? Math.max(0, (update.observedAtMs - this.transitionStartedAtMs) / 1000)
+        : 0;
+
+    return {
+      ...update,
+      playback: {
+        ...update.playback,
+        positionSeconds: syntheticPosition,
+        durationSeconds: null,
+      },
+    };
+  }
+}
