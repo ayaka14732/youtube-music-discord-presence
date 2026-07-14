@@ -10,10 +10,10 @@ const discordStatus = document.querySelector<HTMLElement>("#discord-status");
 const errorElement = document.querySelector<HTMLElement>("#error");
 
 const labels = {
-  disconnected: "未连接",
-  connecting: "连接中",
-  connected: "已连接",
-  error: "错误",
+  disconnected: "Disconnected",
+  connecting: "Connecting",
+  connected: "Connected",
+  error: "Error",
 } as const;
 
 function renderConnection(
@@ -34,12 +34,14 @@ function render(status: ExtensionStatus): void {
   if (status.activeActivity) {
     if (songElement) songElement.textContent = status.activeActivity.title;
     if (artistElement) {
-      const suffix = status.activeActivity.playbackState === "paused" ? " · 已暂停" : "";
+      const suffix = status.activeActivity.playbackState === "paused" ? " · Paused" : "";
       artistElement.textContent = `${status.activeActivity.artists.join(", ")}${suffix}`;
     }
   } else {
-    if (songElement) songElement.textContent = status.enabled ? "等待 YouTube Music…" : "共享已关闭";
-    if (artistElement) artistElement.textContent = status.enabled ? "播放歌曲后会自动显示" : "";
+    if (songElement) {
+      songElement.textContent = status.enabled ? "Waiting for YouTube Music…" : "Presence disabled";
+    }
+    if (artistElement) artistElement.textContent = status.enabled ? "Start playing a song to share it" : "";
   }
 
   if (errorElement) {
