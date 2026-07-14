@@ -38,6 +38,10 @@ export function toActivityPayload(source: TabSource): ActivityPayload | null {
 
 export function activityFingerprint(activity: ActivityPayload | null): string {
   if (!activity) return "clear";
+  const timelineAnchor =
+    activity.playbackState === "playing"
+      ? Math.round((activity.observedAtMs - activity.positionSeconds * 1000) / 5_000)
+      : Math.floor(activity.positionSeconds);
   return JSON.stringify({
     title: activity.title,
     artists: activity.artists,
@@ -45,7 +49,7 @@ export function activityFingerprint(activity: ActivityPayload | null): string {
     artworkUrl: activity.artworkUrl,
     trackUrl: activity.trackUrl,
     playbackState: activity.playbackState,
-    position: Math.floor(activity.positionSeconds),
+    timelineAnchor,
     duration: activity.durationSeconds && Math.floor(activity.durationSeconds),
   });
 }

@@ -1,6 +1,7 @@
 import type { PlaybackUpdate } from "@ytmdp/shared";
 import { describe, expect, it } from "vitest";
 import {
+  activityFingerprint,
   selectActiveSource,
   toActivityPayload,
   type TabSource,
@@ -59,5 +60,22 @@ describe("extension state arbitration", () => {
       durationSeconds: 100,
       observedAtMs: 1_000,
     });
+  });
+
+  it("deduplicates natural playback progress but detects seeks and duration changes", () => {
+    const initial = toActivityPayload(source(1, "playing", 10_000));
+    const progressed = toActivityPayload(source(1, "playing", 11_000));
+    const seeked = toActivityPayload(source(1, "playing", 12_000));
+    if (!initial || !progressed || !seeked) throw new Error("missing activity fixture");
+
+    initial.positionSeconds = 10;
+    progressed.positionSeconds = 11;
+    seeked.positionSeconds = 50;
+
+    expect(activityFingerprint(progressed)).toBe(activityFingerprint(initial));
+    expect(activityFingerprint(seeked)).not.toBe(activityFingerprint(initial));
+
+    progressed.durationSeconds = 200;
+    expect(activityFingerprint(progressed)).not.toBe(activityFingerprint(initial));
   });
 });

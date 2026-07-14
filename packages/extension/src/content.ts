@@ -20,6 +20,11 @@ if (!window.__ytmdpContentLoaded) {
     void chrome.runtime.sendMessage(message).catch(() => {
       // The extension may have been reloaded while this page stayed open.
     });
+
+    // YouTube Music can update the title before resetting the shared media
+    // element. Poll briefly so the corrected duration and position are sent
+    // even when that reset does not produce an observable DOM mutation.
+    if (transitionGuard.needsFollowUpSnapshot) scheduleSnapshot(250);
   };
 
   const scheduleSnapshot = (delayMs = 120): void => {

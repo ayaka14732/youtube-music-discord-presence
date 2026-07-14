@@ -13,6 +13,7 @@ function setPlayerMarkup(): HTMLMediaElement {
       <a class="title" href="/watch?v=abc123">A Song</a>
       <div class="byline">First Artist &amp; Second Artist • The Album • 2026</div>
       <img class="image" src="https://lh3.googleusercontent.com/art=w120-h120" />
+      <span class="time-info">0:42 / 3:00</span>
     </ytmusic-player-bar>
     <video></video>
   `;
@@ -59,6 +60,35 @@ describe("YouTube Music player reader", () => {
     expect(update.track).toBeNull();
     expect(update.playback.state).toBe("stopped");
   });
+
+  it("falls back to the displayed player time when media timing is unavailable", () => {
+    const media = setPlayerMarkup();
+    const timeInfo = document.querySelector<HTMLElement>(".time-info");
+    if (!timeInfo) throw new Error("missing time info");
+    timeInfo.textContent = "0:15 / 4:08";
+    Object.defineProperties(media, {
+      currentTime: { configurable: true, value: Number.NaN },
+      duration: { configurable: true, value: Number.NaN },
+    });
+
+    expect(createPlaybackUpdate(document, "source-1", 123456).playback).toEqual({
+      state: "playing",
+      positionSeconds: 15,
+      durationSeconds: 248,
+    });
+  });
+
+  it("uses a reset displayed time while the shared media element is still stale", () => {
+    setPlayerMarkup();
+    const timeInfo = document.querySelector<HTMLElement>(".time-info");
+    if (!timeInfo) throw new Error("missing time info");
+    timeInfo.textContent = "0:01 / 4:08";
+
+    expect(createPlaybackUpdate(document, "source-1", 123456).playback).toMatchObject({
+      positionSeconds: 1,
+      durationSeconds: 248,
+    });
+  });
 });
 
 describe("track transition guard", () => {
@@ -86,12 +116,31 @@ describe("track transition guard", () => {
       positionSeconds: 0,
       durationSeconds: null,
     });
+    expect(guard.isTransitioning).toBe(true);
+    expect(guard.needsFollowUpSnapshot).toBe(true);
 
     const resetSnapshot = guard.stabilize(update("New song", 0.4, 1_500));
     expect(resetSnapshot.playback).toMatchObject({
       positionSeconds: 0.4,
       durationSeconds: 508,
     });
+    expect(guard.isTransitioning).toBe(false);
+    expect(guard.needsFollowUpSnapshot).toBe(false);
+  });
+
+  it("stops requesting transition snapshots after a short polling window", () => {
+    const guard = new TrackTransitionGuard();
+    guard.stabilize(update("Old song", 455, 1_000));
+    guard.stabilize(update("New song", 455, 1_100));
+
+    const laterSnapshot = guard.stabilize(update("New song", 460, 6_100));
+
+    expect(laterSnapshot.playback).toMatchObject({
+      positionSeconds: 0,
+      durationSeconds: null,
+    });
+    expect(guard.isTransitioning).toBe(true);
+    expect(guard.needsFollowUpSnapshot).toBe(false);
   });
 
   it("preserves a non-zero position on the first page snapshot", () => {

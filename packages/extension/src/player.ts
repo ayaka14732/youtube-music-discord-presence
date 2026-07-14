@@ -19,6 +19,13 @@ const ARTWORK_SELECTORS = [
   "yt-img-shadow img",
 ];
 
+const TIME_INFO_SELECTORS = [
+  ".time-info.ytmusic-player-bar",
+  ".time-info",
+];
+
+const TRANSITION_POLL_WINDOW_MS = 5_000;
+
 function firstText(root: ParentNode, selectors: readonly string[]): string | null {
   for (const selector of selectors) {
     const element = root.querySelector<HTMLElement>(selector);
@@ -56,6 +63,52 @@ function parseAlbum(byline: string): string | undefined {
     .map((segment) => segment.trim())
     .filter(Boolean);
   return segments.length >= 2 ? segments[1] : undefined;
+}
+
+function parseClock(value: string): number | null {
+  const parts = value.split(":").map(Number);
+  if (
+    (parts.length !== 2 && parts.length !== 3) ||
+    parts.some((part) => !Number.isFinite(part) || part < 0)
+  ) {
+    return null;
+  }
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+    return minutes !== undefined && seconds !== undefined ? minutes * 60 + seconds : null;
+  }
+
+  const [hours, minutes, seconds] = parts;
+  return hours !== undefined && minutes !== undefined && seconds !== undefined
+    ? hours * 3600 + minutes * 60 + seconds
+    : null;
+}
+
+export interface DisplayedPlaybackTime {
+  positionSeconds: number;
+  durationSeconds: number;
+}
+
+export function readDisplayedPlaybackTime(document: Document): DisplayedPlaybackTime | null {
+  const playerBar = document.querySelector<HTMLElement>("ytmusic-player-bar");
+  if (!playerBar) return null;
+  const root: ParentNode = playerBar.shadowRoot ?? playerBar;
+
+  for (const selector of TIME_INFO_SELECTORS) {
+    const element = root.querySelector<HTMLElement>(selector);
+    const text = (element?.innerText || element?.textContent)?.trim();
+    if (!text) continue;
+
+    const clocks = text.match(/\d+:\d{2}(?::\d{2})?/g);
+    if (!clocks || clocks.length < 2) continue;
+    const positionSeconds = parseClock(clocks[0] ?? "");
+    const durationSeconds = parseClock(clocks[1] ?? "");
+    if (positionSeconds === null || durationSeconds === null || durationSeconds <= 0) continue;
+    return { positionSeconds, durationSeconds };
+  }
+
+  return null;
 }
 
 function findTrackUrl(root: ParentNode, locationHref: string): string | undefined {
@@ -124,8 +177,16 @@ export function createPlaybackUpdate(
 ): PlaybackUpdate {
   const track = readTrack(document);
   const media = findMediaElement(document);
+  const displayedTime = readDisplayedPlaybackTime(document);
   const hasTrack = track !== null;
   const isPlaying = Boolean(media && !media.paused && !media.ended && hasTrack);
+  const mediaPosition = finiteOrZero(media?.currentTime ?? 0);
+  const positionSeconds =
+    displayedTime && Math.abs(displayedTime.positionSeconds - mediaPosition) > 5
+      ? displayedTime.positionSeconds
+      : mediaPosition;
+  const mediaDuration =
+    media && Number.isFinite(media.duration) && media.duration > 0 ? media.duration : null;
 
   return {
     type: "PLAYBACK_UPDATE",
@@ -135,11 +196,8 @@ export function createPlaybackUpdate(
     track,
     playback: {
       state: isPlaying ? "playing" : hasTrack ? "paused" : "stopped",
-      positionSeconds: finiteOrZero(media?.currentTime ?? 0),
-      durationSeconds:
-        media && Number.isFinite(media.duration) && media.duration > 0
-          ? media.duration
-          : null,
+      positionSeconds,
+      durationSeconds: displayedTime?.durationSeconds ?? mediaDuration,
     },
   };
 }
@@ -152,8 +210,22 @@ function trackIdentity(update: PlaybackUpdate): string | null {
 export class TrackTransitionGuard {
   private lastTrackIdentity: string | null = null;
   private transitionStartedAtMs: number | null = null;
+  private lastObservedAtMs: number | null = null;
+
+  get isTransitioning(): boolean {
+    return this.transitionStartedAtMs !== null;
+  }
+
+  get needsFollowUpSnapshot(): boolean {
+    return (
+      this.transitionStartedAtMs !== null &&
+      this.lastObservedAtMs !== null &&
+      this.lastObservedAtMs - this.transitionStartedAtMs < TRANSITION_POLL_WINDOW_MS
+    );
+  }
 
   stabilize(update: PlaybackUpdate): PlaybackUpdate {
+    this.lastObservedAtMs = update.observedAtMs;
     const identity = trackIdentity(update);
     if (!identity) return update;
 
@@ -171,16 +243,11 @@ export class TrackTransitionGuard {
       return update;
     }
 
-    const syntheticPosition =
-      update.playback.state === "playing"
-        ? Math.max(0, (update.observedAtMs - this.transitionStartedAtMs) / 1000)
-        : 0;
-
     return {
       ...update,
       playback: {
         ...update.playback,
-        positionSeconds: syntheticPosition,
+        positionSeconds: 0,
         durationSeconds: null,
       },
     };
