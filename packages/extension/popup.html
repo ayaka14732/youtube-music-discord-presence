@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube Music Discord Presence</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="logo" aria-hidden="true">♫</div>
+        <div>
+          <h1>YouTube Music</h1>
+          <p>Discord Presence</p>
+        </div>
+        <label class="switch" title="开启或关闭共享">
+          <input id="enabled" type="checkbox" />
+          <span></span>
+        </label>
+      </header>
+
+      <section class="now-playing">
+        <div class="eyebrow">当前共享</div>
+        <div id="song" class="song">等待 YouTube Music…</div>
+        <div id="artist" class="artist">播放歌曲后会自动显示</div>
+      </section>
+
+      <section class="status-grid">
+        <div>
+          <span class="label">Native Host</span>
+          <span id="host-status" class="status">检查中</span>
+        </div>
+        <div>
+          <span class="label">Discord</span>
+          <span id="discord-status" class="status">检查中</span>
+        </div>
+      </section>
+
+      <section class="settings">
+        <label for="pause-timeout">暂停后隐藏</label>
+        <select id="pause-timeout">
+          <option value="0">立即</option>
+          <option value="1">1 分钟</option>
+          <option value="5">5 分钟</option>
+          <option value="10">10 分钟</option>
+          <option value="30">30 分钟</option>
+          <option value="-1">永不</option>
+        </select>
+      </section>
+
+      <div id="error" class="error" hidden></div>
+      <button id="reconnect" type="button">重新连接</button>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

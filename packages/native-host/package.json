@@ -1,0 +1,11 @@
+{
+  "name": "@ytmdp/native-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@xhayper/discord-rpc": "1.3.4",
+    "@ytmdp/shared": "workspace:*",
+    "zod": "4.4.3"
+  }
+}

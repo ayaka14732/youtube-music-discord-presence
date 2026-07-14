@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Music Discord Presence",
+  "version": "0.1.0",
+  "description": "Shows the current YouTube Music track as Discord Rich Presence.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvzA4Vj67dRlJfJdN33KW9XcazqlZMcwcUOTJnU4YSz3SbVjEGQUIA/CdM/S1Lk3x0hGXCmY3i4zxjErMTMYGlZVEtM+osgbbFZYC05yhXPtqSVoVu4OkCX7JnlhXnuta+CXmESvnBhP7SvKGGUx0d4Afpcb2MHL81eMnPqc/bYOBRU/3ZFPUiBA75E1SaMSEWVttBAzsPosMPZUJcIn36UJJxQ6f7Mc87HPRneAAsRjVfOHwE+5WN66X36t5uUFi+7D9TDhDnvNzdo54fFz2ztgiUvcTjXbQJlTKMCRR84H/g+kV0gAHKh0RydFx1TD4dFHH1wo09ZZ8NcjQoqkUTQIDAQAB",
+  "minimum_chrome_version": "120",
+  "permissions": ["alarms", "nativeMessaging", "storage"],
+  "host_permissions": ["https://music.youtube.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://music.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "YouTube Music Discord Presence"
+  }
+}
