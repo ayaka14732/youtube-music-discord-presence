@@ -8,6 +8,7 @@ const HOST_VERSION = "0.1.0";
 const decoder = new NativeMessageDecoder();
 let presence: DiscordPresence | null = null;
 let shuttingDown = false;
+let stdoutAvailable = true;
 
 function log(message: string, error?: unknown): void {
   const suffix = error ? `: ${error instanceof Error ? error.stack ?? error.message : String(error)}` : "";
@@ -15,6 +16,7 @@ function log(message: string, error?: unknown): void {
 }
 
 function send(message: NativeResponse): void {
+  if (!stdoutAvailable) return;
   try {
     process.stdout.write(encodeNativeMessage(message));
   } catch (error) {
@@ -53,12 +55,27 @@ async function shutdown(exitCode = 0): Promise<void> {
   const forceExit = setTimeout(() => process.exit(exitCode), 1_500);
   forceExit.unref();
   await presence?.shutdown();
-  await Promise.all([
-    new Promise<void>((resolve) => process.stdout.write("", resolve)),
-    new Promise<void>((resolve) => process.stderr.write("", resolve)),
-  ]);
+  const flushes = [
+    new Promise<void>((resolve) =>
+      process.stderr.write(Buffer.alloc(0), undefined, () => resolve()),
+    ),
+  ];
+  if (stdoutAvailable) {
+    flushes.push(
+      new Promise<void>((resolve) =>
+        process.stdout.write(Buffer.alloc(0), undefined, () => resolve()),
+      ),
+    );
+  }
+  await Promise.all(flushes);
   process.exit(exitCode);
 }
+
+process.stdout.on("error", (error: NodeJS.ErrnoException) => {
+  stdoutAvailable = false;
+  if (error.code !== "EPIPE") log("stdout error", error);
+  void shutdown(error.code === "EPIPE" ? 0 : 1);
+});
 
 send({ type: "HOST_READY", protocolVersion: PROTOCOL_VERSION, version: HOST_VERSION });
 

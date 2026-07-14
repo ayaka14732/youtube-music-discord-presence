@@ -13,6 +13,7 @@ export function buildDiscordActivity(activity: ActivityPayload) {
   const startTimestamp = Date.now() - correctedPosition * 1000;
 
   return {
+    name: "YouTube Music",
     type: 2,
     statusDisplayType: 2,
     details: truncate(activity.title, 128),

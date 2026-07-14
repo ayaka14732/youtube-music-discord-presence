@@ -15,6 +15,7 @@ describe("Discord activity mapping", () => {
     });
 
     expect(result).toMatchObject({
+      name: "YouTube Music",
       type: 2,
       details: "Track",
       state: "Artist",
